@@ -1,4 +1,4 @@
-# OriginZero Job Interview
+## OriginZero Job Interview
 
 1. Answer the questions in OriginZero_Interview.docx
 2. Answer the questions in question.c
