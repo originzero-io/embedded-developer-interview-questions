@@ -1,8 +1,8 @@
 /**
-	- Find and edit the logic errors in the code below, report the errors and their solutions.
+	- Find out and edit the logic errors in the code below, report the errors and their solutions.
 	- Make sure the whole program runs with as little latency as possible.
-	- Make it more readable modular.
-	- Enter a description line in the fields you deem necessary.
+	- Design your code modularly.
+	- Enter a comment line in the fields you deem necessary.
 **/
 
 #include <stdint.h>
