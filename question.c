@@ -32,15 +32,16 @@ void main(void)
 	{
 		if(button_read_time(button_no, 1000) == 1)
 		{	
+			// butondan elin çekilmesi beklenir
+			while (button_read_time(button_no, 1000) != 0) {}
+
+			// butona basıldığında okunan buton indexi bir artar ve arttırılmış indexteki led de yanar 
+			// index buton sayısına gelince tekrar 0 olarak başa sarar
 			button_no  = (button_no < BUTTON_COUNT) ? button_no + 1 : 0;
 
 			led_toggle(button_no);
 		}
 		
-		
-		
-		delay(100);
-		send_ack();
 	}
 }
 
@@ -48,6 +49,11 @@ void main(void)
 void ISR(void) //Internal interrupt Period 1ms
 {
 	counter++;
+
+	if (counter % 100  == 0)
+	{
+		send_ack();
+	}
 }
 
 static void delay_ms(uint32_t time)
@@ -78,17 +84,23 @@ void led_toggle(uint8_t led_no);
 uint8_t button_read_time(uint8_t button_no, uint32_t time)
 {
 	uint32_t tickstart = counter;
-	while(button_read(button_no) == 1)
+
+	
+	while ((counter - tickstart) >= time)
 	{
-		if((counter - tickstart) >= time)
+		if (button_read(button_no) == 1)
 		{
 			return 1;
 		}
+		else
+		{
+			return 0;
+		}
 	}
 	
-	return 0;
+	// timeout
+	return 99;
 }
-
 
 uint8_t send_ack(void)
 {	
