@@ -18,8 +18,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stdbool.h"
-#include "string.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -62,6 +60,7 @@ uint16_t input_byte = 0;
 // Receive buffer
 uint8_t incoming_packet[MAX_PACKET_SIZE] = { };
 uint16_t packet_index = 0;
+uint8_t byte_receive = 0;
 
 // Storage Buffer
 uint8_t data_process[PACKET_BUFFER_DEPTH][MAX_PACKET_SIZE] = { };
@@ -77,7 +76,7 @@ static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 // CRC calculation
-uint32_t crc32(const char* s, size_t n);
+uint32_t crc32(const char *s, size_t n);
 
 // Checksum calculation
 static uint8_t checksum_base_calculate(uint32_t checksum_total_value);
@@ -123,6 +122,8 @@ int main(void) {
 	MX_USART2_UART_Init();
 	/* USER CODE BEGIN 2 */
 
+	HAL_UART_Receive_IT(&huart2, &byte_receive, 1);
+
 	// For debugging
 	const uint8_t hey[] = "HEY!\r\n";
 	HAL_UART_Transmit(&huart2, hey, sizeof(hey), HAL_MAX_DELAY);
@@ -143,15 +144,16 @@ int main(void) {
 
 		// Process received package
 		if (data_process_index > 0) {
-			uint16_t current_process = data_process_index - 1;// Array index to use
+			uint16_t current_process = data_process_index - 1; // Array index to use
 
 			// Extract data size
 			uint16_t data_size = ((data_process[current_process][1] << 8)
 					| (data_process[current_process][2]));
 
-			 // Calculate CRC
-			 uint32_t crc_calc = crc32((const char*) (data_process[data_process_index]),
-			 data_size - 5);
+			// Calculate CRC
+			uint32_t crc_calc = crc32(
+					(const char*) (data_process[data_process_index]),
+					data_size - 5);
 
 			// Extract CRC
 			uint32_t crc_recv = 0;
@@ -303,7 +305,7 @@ static void MX_GPIO_Init(void) {
 /* USER CODE BEGIN 4 */
 
 // Consider look up table implementation
-uint32_t crc32 (const char *s, size_t n) {
+uint32_t crc32(const char *s, size_t n) {
 	uint32_t crc = 0xFFFFFFFF;
 
 	for (size_t i = 0; i < n; i++) {
@@ -337,6 +339,58 @@ uint8_t checksum_calculate(const uint8_t *s, size_t n) {
 
 	return checksum_base_calculate(checksum);
 	//return 0xA0;
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	// Value already read into buffer
+
+	// Will be used to check end of package later
+	static uint16_t data_length = 0;
+
+	// Check if start byte has received
+	if (incoming_packet[0] == START_BYTE) {
+		packet_index++; // Increase index for next element
+
+		// Checksum check
+		if (packet_index == HEADER_LENGTH) {
+			uint8_t checksum_calc = checksum_calculate(incoming_packet,
+			HEADER_LENGTH - 1);
+
+			if (checksum_calc != incoming_packet[HEADER_LENGTH - 1]) {
+				// Invalid Checksum
+				packet_index = 0;	// Reset buffer
+
+				// Debugging purposes only. Error report.
+				const uint8_t str[] = "Checksum error!";
+				HAL_UART_Transmit(&huart2, str, sizeof(str), HAL_MAX_DELAY);
+			} else {
+				// Valid Checksum
+				// Find the end index of the packet
+				data_length =
+						((incoming_packet[1] << 8) | (incoming_packet[2]));
+			}
+		} else if ((packet_index > HEADER_LENGTH)
+				&& (packet_index > data_length)) {
+			// End of packet
+			// Maybe check for stop byte?
+
+			// Copy package to process buffer
+			memcpy(data_process[data_process_index], incoming_packet,
+					packet_index);
+			data_process_index++;	// Increase number of data to be processed
+			packet_index = 0;	// Reset buffer
+		}
+	}
+	// Debugging purposes only.
+	input_byte++;	// Increment receive array
+	if (input_byte == sizeof(input_stream)) {
+		// Reset receive array
+		input_byte = 0;
+	}
+
+
+	// Enable interrupt and read next data coming
+	HAL_UART_Receive_IT(&huart2, &byte_receive, 1);
 }
 
 void interupt_sim() {
