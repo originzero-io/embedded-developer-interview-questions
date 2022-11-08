@@ -163,8 +163,14 @@ uint8_t sendAck(void)
             return 1;
         }
     }
+    while(buttonRead(buttonNo) == 0)
+    {
+        if((counter - tickStart) >= buttonArkThershold)
+        {
+            return 0;
+        }
+    }
     
-    return 0;
 }
 
 
