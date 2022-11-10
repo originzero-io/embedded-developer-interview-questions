@@ -17,10 +17,13 @@ void ledInit(void);
 void ledToggle(uint8_t ledNumber);
 uint8_t buttonReadTime(uint8_t buttonNumber, uint32_t time);  // Must be prototyped like this. "uint8_t button_read_time(uint32_t time)" is false
 uint8_t sendAck(void);
-
+void systemRoutine(uint8_t buttonNo);
 // For created to count elapsed time
 static int32_t counter = 0;
-
+// for acknowledge
+static uint8_t ackFlag = 0;
+// for delay
+static uint32_t start = 0;
 
 int main(void)  // must be int instead of void "void main(void)" is false
 {
@@ -35,24 +38,8 @@ int main(void)  // must be int instead of void "void main(void)" is false
     
     while(1)
     {
-        // Is the correct button pressed for 1 second?
-        if(buttonReadTime(buttonNo, 1000) == 1)
-        {
-            // toggle the correct led
-            ledToggle(buttonNo);
-            
-            // switch to next led
-            buttonNo  = (buttonNo < buttonCount) ? buttonNo + 1 : 0; // If we increase it by one at first, the led with 1 more than the number of buttons will light up.
-
-            
-        }
-        
-        
-        // 100 millisecond delay
-        delayMs(100);  // Func name is false. "delay(100)" is false;
-        
-        // send acknowledge about buton state
-        sendAck();
+        // led toggles, 100 ms delay and sends an acknowledge message
+        systemRoutine(buttonNo);
     }
 }
 
@@ -135,7 +122,8 @@ void ledToggle(uint8_t ledNumber) //  void led_toggle(uint8_t led_no);
 uint8_t buttonReadTime(uint8_t buttonNumber, uint32_t time)
 {
     uint32_t tickStart = counter;
-    while(buttonRead(buttonNumber) == 1)
+    // Is button pressed and ıs not that ark
+    if(buttonRead(buttonNumber) == 1 && (counter - tickStart >= buttonArkThershold))
     {
         if((counter - tickStart) >= time)
         {
@@ -149,28 +137,42 @@ uint8_t buttonReadTime(uint8_t buttonNumber, uint32_t time)
 /*
  * @brief Send acknowledge
  * @param[in] NONE
- * @return 1 or 0 depend on accuracy
- * @details Confirms the button status
  */
 uint8_t sendAck(void)
 {
-    volatile uint8_t buttonNo = '\0';
-    uint32_t tickStart = counter;
-    while(buttonRead(buttonNo) == 0)
-    {
-        if((counter - tickStart) >= buttonArkThershold)
-        {
-            return 1;
-        }
-    }
-    while(buttonRead(buttonNo) == 1)
-    {
-        if((counter - tickStart) >= buttonArkThershold)
-        {
-            return 0;
-        }
-    }
     
+}
+
+/*
+ * @brief If the necessary conditions are met, the led will toggle
+ * @param[in] buttonNo Deciding which led toggle will be
+ * @return NONE
+ * @details If the button is pressed for 1 second, the led toggles. It waits for 100ms. sends acknowledgement.
+ */
+void systemRoutine(uint8_t buttonNo) {
+    // Is the correct button pressed for 1 second and acknowledge flag true?
+    if(buttonReadTime(buttonNo, 1000) == 1 && ackFlag == 0)
+    {
+        // toggle the correct led
+        ledToggle(buttonNo);
+        
+        // switch to next led
+        buttonNo  = (buttonNo < buttonCount) ? buttonNo + 1 : 0; // If we increase it by one at first, the led with 1 more than the number of buttons will light up.
+        // to wait for the delay function even if the button is pressed
+        ackFlag |= 1;
+        // to know when the last toggle operation was done
+        start = counter;
+    }
+    // Is ackflag true? For 100 milisecond waiting then send acknowledge
+    if(ackFlag == 1) {
+        // 100 millisecond delay
+        if(counter >= (start+100)) {
+            // send acknowledge about buton state
+            sendAck();
+            // to re-enter the toggle operation.
+            ackFlag &= 0;
+        }
+    }
 }
 
 
